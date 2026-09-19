@@ -25,7 +25,11 @@ Send protected requests with `Authorization: Bearer <token>`. Schedule mutations
 - `GET /auth/me`
 - `POST /auth/logout`
 - `POST /email/verification-notification`
-- `DELETE /account` with `{ "confirmation": "DELETE" }` — permanently deletes the user and all owned data.
+- `DELETE /account` — permanently deletes the user and all owned data. Re-authentication is required and depends on how the account signs in:
+  - Accounts with a password send `{ "password": "<current password>" }`. A wrong or missing password returns `422 validation_failed` with `error.details.password`.
+  - Google-created accounts store a null password, so they send `{ "confirmation": "DELETE" }` instead. Without this fallback those accounts could never be deleted.
+
+  Clients can choose the correct field from `has_password` on the user resource.
 
 Password and first-time Google registration record `terms_accepted_at`. Google matches a verified provider email to an existing account instead of creating a duplicate.
 
@@ -47,7 +51,11 @@ The today response returns every owned group assigned to that weekday plus flatt
 - `PATCH /timeline-entries/{id}`
 - `DELETE /timeline-entries/{id}`
 
-Writable fields: `start_time`, `end_time`, `description`, `category`, `sort_order`. Categories are Faith, Career, Health, Language, Life, and Rest. Times use 24-hour `HH:MM`; overnight ranges are valid.
+Writable fields: `start_time`, `end_time`, `description`, `category`, `sort_order`. Times use 24-hour `HH:MM`; overnight ranges are valid.
+
+Assignable categories are Career, Health, Language, Life, and Rest.
+
+`Faith` is **retired**: it is rejected with `422 validation_failed` on create and update, but entries stored before retirement keep the value and still read back normally. Omitting `category` on a `PATCH` preserves a retired value, so historical entries remain editable. Retired values are declared in `App\Enums\Category` and must not be deleted — the `category` column is a plain string cast to that enum, so removing a case would break reads for existing rows.
 
 ## Checklist
 
